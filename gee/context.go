@@ -15,6 +15,16 @@ type Context struct {
 	Method     string
 	StatusCode int
 	Params map[string]string
+	handlers []HandlerFunc
+	index int
+}
+
+func (c *Context) Next() {
+	c.index++
+	s := len(c.handlers)
+	for ; c.index < s; c.index++ {
+		c.handlers[c.index](c)
+	}
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
@@ -23,6 +33,7 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		index: -1,
 	}
 }
 
@@ -46,6 +57,11 @@ func (c *Context) Status(code int) {
 
 func (c *Context) SetHeader(key string, value string) {
 	c.Writer.Header().Set(key, value)
+}
+
+func (c *Context) Fail(code int, err string) {
+	c.index = len(c.handlers)
+	c.JSON(code, H{"message": err})
 }
 
 func (c *Context) String(code int, format string, values ...interface{}) {
