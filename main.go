@@ -16,12 +16,11 @@ func onlyForV2() gee.HandlerFunc {
 		// Calculate resolution time
 		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Req.RequestURI, time.Since(t))
 	}
-	http.StripPrefix()
 }
 
 func main() {
 	r := gee.New()
-	r.Use(gee.Logger()) // global midlleware
+	r.Use(gee.Logger(), gee.Recovery()) // global midlleware
 	r.GET("/", func(c *gee.Context) {
 		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
 	})
@@ -34,6 +33,11 @@ func main() {
 			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
 		})
 	}
+
+	r.GET("/renchen", func(c *gee.Context) {
+		temp := "renchen"
+		c.String(http.StatusOK, "hello world %s", temp[12]);
+	})
 
 	r.Run(":9999")
 }
