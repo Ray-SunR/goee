@@ -1,66 +1,78 @@
 package main
 
 import (
-	"gee"
+	"flag"
+	"fmt"
+	gee "cache"
 	"log"
 	"net/http"
-	"time"
 )
 
-func onlyForV2() gee.HandlerFunc {
-	return func(c *gee.Context) {
-		// Start timer
-		t := time.Now()
-		// if a server error occurred
-		c.Fail(500, "Internal Server Error")
-		// Calculate resolution time
-		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Req.RequestURI, time.Since(t))
-	}
+var db = map[string]string{
+	"Tom":  "630",
+	"Jack": "589",
+	"Sam":  "567",
+}
+
+func createGroup() *gee.Group {
+	return gee.NewGroup("scores", 2<<10, gee.GetterFunc(
+		func(key string) ([]byte, error) {
+			log.Println("[SlowDB] search key", key)
+			if v, ok := db[key]; ok {
+				return []byte(v), nil
+			}
+			return nil, fmt.Errorf("%s not exist", key)
+		}))
+}
+
+func startCacheServer(addr string, addrs []string, geeGroup *gee.Group) {
+	peers := gee.NewHTTPPool(addr)
+	peers.Set(addrs...)
+	geeGroup.RegisterPeers(peers)
+	log.Println("gee is running at", addr)
+	log.Fatal(http.ListenAndServe(addr[7:], peers))
+}
+
+func startAPIServer(apiAddr string, gee *gee.Group) {
+	http.Handle("/api", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			key := r.URL.Query().Get("key")
+			view, err := gee.Get(key)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Write(view.ByteSlice())
+
+		}))
+	log.Println("fontend server is running at", apiAddr)
+	log.Fatal(http.ListenAndServe(apiAddr[7:], nil))
+
 }
 
 func main() {
-	r := gee.New()
-	r.Use(gee.Logger(), gee.Recovery()) // global midlleware
-	r.GET("/", func(c *gee.Context) {
-		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
-	})
+	var port int
+	var api bool
+	flag.IntVar(&port, "port", 8001, "gee server port")
+	flag.BoolVar(&api, "api", false, "Start a api server?")
+	flag.Parse()
 
-	v2 := r.Group("/v2")
-	v2.Use(onlyForV2()) // v2 group middleware
-	{
-		v2.GET("/hello/:name", func(c *gee.Context) {
-			// expect /hello/geektutu
-			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
-		})
+	apiAddr := "http://localhost:9999"
+	addrMap := map[int]string{
+		8001: "http://localhost:8001",
+		8002: "http://localhost:8002",
+		8003: "http://localhost:8003",
 	}
 
-	r.GET("/renchen", func(c *gee.Context) {
-		temp := "renchen"
-		c.String(http.StatusOK, "hello world %s", temp[12]);
-	})
+	var addrs []string
+	for _, v := range addrMap {
+		addrs = append(addrs, v)
+	}
 
-	r.Run(":9999")
+	gee := createGroup()
+	if api {
+		go startAPIServer(apiAddr, gee)
+	}
+	startCacheServer(addrMap[port], []string(addrs), gee)
 }
-//
-//func main() {
-//	r := gee.New()
-//	r.GET("/", func(c *gee.Context) {
-//		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
-//	})
-//
-//	r.GET("/hello", func(c *gee.Context) {
-//		// expect /hello?name=geektutu
-//		c.String(http.StatusOK, "hello %s, you're at %s\n", c.Query("name"), c.Path)
-//	})
-//
-//	r.GET("/hello/:name", func(c *gee.Context) {
-//		// expect /hello/geektutu
-//		c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
-//	})
-//
-//	r.GET("/assets/*filepath", func(c *gee.Context) {
-//		c.JSON(http.StatusOK, gee.H{"filepath": c.Param("filepath")})
-//	})
-//
-//	r.Run(":9999")
-//}

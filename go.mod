@@ -1,11 +1,14 @@
 module example
 
-go 1.13
-
-require gee v0.0.0
-
-require cache v0.0.0
+go 1.16
 
 replace gee => ./gee
 
 replace cache => ./cache
+
+replace consistenthash => ./consistenthash
+
+require (
+	cache v0.0.0-00010101000000-000000000000
+	gee v0.0.0-00010101000000-000000000000
+)

@@ -10,10 +10,10 @@ import (
 type Hash func([]byte) uint32
 
 type Map struct {
-	hashFunc Hash // hash function
-	replica int // number of virtual nodes per physical node
-	virtualKeys []int // virtual node keys
-	keysMap map[int]string // mapping between virtual nodes to physical node
+	hashFunc    Hash           // hash function
+	replica     int            // number of virtual nodes per physical node
+	virtualKeys []int          // virtual node keys
+	keysMap     map[int]string // mapping between virtual nodes to physical node
 }
 
 func New(replica int, hashFunc Hash) *Map {
